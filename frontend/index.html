@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f7f4" />
+    <meta name="description" content="SpendStory helps families track shared expenses and understand household spending." />
+    <title>SpendStory — Family Expense Tracker</title>
+
+    <!-- Load the fonts used by the interface. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- External CSS file: keep style.css in the same folder as index.html. -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="app">
+        <!-- =====================================================
+             AUTHENTICATION
+             Sign in, join an existing family, or create a family.
+        ====================================================== -->
+        <section id="authScreen">
+            <div class="auth-intro">
+                <div class="logo">₹</div>
+                <h1>SpendStory</h1>
+                <p>A calmer way to manage money together.</p>
+            </div>
+
+            <div class="card auth-card">
+                <div class="tabs">
+                    <button type="button" class="tab active" id="loginTab">Sign in</button>
+                    <button type="button" class="tab" id="joinTab">Join a family</button>
+                </div>
+
+                <form id="loginForm">
+                    <div>
+                        <label for="loginFamilyCode">Family code</label>
+                        <input id="loginFamilyCode" placeholder="e.g. A1B2C3" autocomplete="off" required />
+                    </div>
+                    <div>
+                        <label for="loginName">Your name</label>
+                        <input id="loginName" placeholder="Enter your name" autocomplete="name" required />
+                    </div>
+                    <div>
+                        <label for="loginPin">PIN</label>
+                        <input id="loginPin" type="password" inputmode="numeric" placeholder="Enter your PIN" autocomplete="current-password" required />
+                    </div>
+                    <button class="btn-primary full" type="submit">Sign in to SpendStory ↗</button>
+                </form>
+
+                <form id="joinForm" class="hidden">
+                    <div>
+                        <label for="joinFamilyCode">Family code</label>
+                        <input id="joinFamilyCode" placeholder="Enter your family code" autocomplete="off" required />
+                    </div>
+                    <div>
+                        <label for="joinName">Your name</label>
+                        <input id="joinName" placeholder="Enter your name" autocomplete="name" required />
+                    </div>
+                    <div>
+                        <label for="joinPin">Create a PIN</label>
+                        <input id="joinPin" type="password" inputmode="numeric" placeholder="Choose a PIN" autocomplete="new-password" required />
+                    </div>
+                    <button class="btn-primary full" type="submit">Join family ↗</button>
+                </form>
+            </div>
+
+            <div class="card auth-secondary">
+                <h2>Create a family space</h2>
+                <p class="subtext">Start tracking shared expenses with your household.</p>
+                <form id="familyForm">
+                    <div>
+                        <label for="familyName">Family name</label>
+                        <input id="familyName" placeholder="e.g. Sharma Family" required />
+                    </div>
+                    <button class="btn-light full" type="submit">＋ Create new family</button>
+                </form>
+                <div id="familyResult" class="result-panel hidden"></div>
+            </div>
+        </section>
+
+        <!-- =====================================================
+             MAIN DASHBOARD
+             Left column: Add expense and Recent expenses.
+             Right column: Member Summary, Monthly Summary, & Yearly Breakdown.
+        ====================================================== -->
+        <section id="dashboard" class="hidden">
+            <header class="topbar">
+                <div class="brand">
+                    <div class="logo">₹</div>
+                    <div>SpendStory<small>Family finances</small></div>
+                </div>
+
+                <div class="user-chip">
+                    <span class="avatar" id="userAvatar">U</span>
+                    <span id="userName">User</span>
+                    <button class="btn-small btn-danger" id="logoutBtn" type="button">Log out</button>
+                </div>
+            </header>
+
+            <div class="welcome">
+                <div>
+                    <div class="eyebrow">Your overview</div>
+                    <h1>Money, made clearer.</h1>
+                    <p>Here's how your household spending is looking.</p>
+                </div>
+            </div>
+
+            <!-- Key household totals -->
+            <div class="stats">
+                <div class="stat">
+                    <span>All expenses</span>
+                    <strong id="totalCount">0</strong>
+                </div>
+                <div class="stat">
+                    <span>Total spent</span>
+                    <strong id="totalAmount">₹0</strong>
+                </div>
+                <div class="stat">
+                    <span>This month</span>
+                    <strong id="monthAmount">₹0</strong>
+                </div>
+                <div class="stat">
+                    <span>This year</span>
+                    <strong id="yearAmount">₹0</strong>
+                </div>
+            </div>
+
+            <!-- Main two-column section -->
+            <div class="main-grid">
+                <!-- Left column: expense form and expense list -->
+                <div class="stack primary-stack">
+                    <section class="card expense-form-card">
+                        <div class="card-head">
+                            <div>
+                                <h2>Add an expense</h2>
+                                <p class="subtext">Record a purchase or shared bill.</p>
+                            </div>
+                            <div class="section-icon">＋</div>
+                        </div>
+
+                        <form id="expenseForm">
+                            <div class="row">
+                                <div>
+                                    <label for="amount">Amount (₹)</label>
+                                    <input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+                                </div>
+                                <div>
+                                    <label for="date">Date</label>
+                                    <input id="date" type="date" required />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="category">Category</label>
+                                <input id="category" list="categoryList" placeholder="Food, travel, bills..." required />
+                                <datalist id="categoryList">
+                                    <option>Food</option>
+                                    <option>Travel</option>
+                                    <option>Shopping</option>
+                                    <option>Bills</option>
+                                    <option>Education</option>
+                                    <option>Health</option>
+                                    <option>Entertainment</option>
+                                    <option>Other</option>
+                                </datalist>
+                            </div>
+
+                            <button class="btn-primary full" type="submit">＋ Add expense</button>
+                        </form>
+                    </section>
+
+                    <section class="card expenses-card">
+                        <div class="card-head">
+                            <div>
+                                <h2>Recent expenses</h2>
+                                <p class="subtext">Your household's recorded spending.</p>
+                            </div>
+                            <div class="section-icon">↗</div>
+                        </div>
+
+                        <div id="expenseList" class="expense-list">
+                            <div class="empty">Loading your expenses…</div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right column: Member Summary, Monthly Summary, and Yearly Breakdown stacked together -->
+                <div class="stack member-stack">
+                    <section class="card member-card">
+                        <div class="card-head">
+                            <div>
+                                <h2>Member Summary</h2>
+                                <p class="subtext">See how much each family member has spent.</p>
+                            </div>
+                            <div class="section-icon">♧</div>
+                        </div>
+
+                        <div id="memberSummary" class="summary-grid">
+                            <div class="empty">Loading member expenses...</div>
+                        </div>
+                    </section>
+
+                    <!-- Secondary summaries moved inside right column -->
+                    <div class="summary-layout">
+                        <section class="card">
+                            <div class="card-head">
+                                <div>
+                                    <h2>Monthly summary</h2>
+                                    <p class="subtext">Check a specific month.</p>
+                                </div>
+                                <div class="section-icon">◷</div>
+                            </div>
+
+                            <div class="row">
+                                <div>
+                                    <label for="summaryYear">Year</label>
+                                    <input id="summaryYear" type="number" placeholder="2026" min="2000" max="2100" />
+                                </div>
+                                <div>
+                                    <label for="summaryMonth">Month</label>
+                                    <select id="summaryMonth">
+                                        <option value="">Select month</option>
+                                        <option value="1">January</option>
+                                        <option value="2">February</option>
+                                        <option value="3">March</option>
+                                        <option value="4">April</option>
+                                        <option value="5">May</option>
+                                        <option value="6">June</option>
+                                        <option value="7">July</option>
+                                        <option value="8">August</option>
+                                        <option value="9">September</option>
+                                        <option value="10">October</option>
+                                        <option value="11">November</option>
+                                        <option value="12">December</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button class="btn-light full summary-button" id="loadMonthly" type="button">Show monthly total</button>
+                            <div id="monthlyResult" class="result-panel hidden"></div>
+                        </section>
+
+                        <section class="card">
+                            <div class="card-head">
+                                <div>
+                                    <h2>Yearly breakdown</h2>
+                                    <p class="subtext">Compare spending month by month.</p>
+                                </div>
+                                <div class="section-icon">▥</div>
+                            </div>
+
+                            <div>
+                                <label for="yearlyYear">Year</label>
+                                <input id="yearlyYear" type="number" placeholder="2026" min="2000" max="2100" />
+                            </div>
+
+                            <button class="btn-light full summary-button" id="loadYearly" type="button">Show breakdown</button>
+                            <div id="yearlyResult" class="hidden"></div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-note">Spend thoughtfully. Plan together.</div>
+        </section>
+    </div>
+
+    <!-- Edit expense dialog -->
+    <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+        <div class="modal-card">
+            <div class="modal-head">
+                <h2 id="editTitle">Edit expense</h2>
+                <button class="btn-quiet" id="closeEdit" type="button" aria-label="Close edit dialog">✕</button>
+            </div>
+
+            <form id="editForm">
+                <div>
+                    <label for="editAmount">Amount (₹)</label>
+                    <input id="editAmount" type="number" min="0.01" step="0.01" required />
+                </div>
+                <div>
+                    <label for="editCategory">Category</label>
+                    <input id="editCategory" required />
+                </div>
+                <div>
+                    <label for="editDate">Date</label>
+                    <input id="editDate" type="date" required />
+                </div>
+                <button class="btn-primary full" type="submit">Save changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast messages are populated by app.js -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

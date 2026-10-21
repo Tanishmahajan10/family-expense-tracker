@@ -1,0 +1,983 @@
+/* =========================================================
+   SPENDSTORY — FAMILY EXPENSE TRACKER
+   Styles are grouped by component for easier maintenance.
+   Keep this file named style.css beside index.html.
+========================================================= */
+
+/* 1. Design tokens: change these values to update the theme. */
+:root {
+    --bg: #f4f7f4;
+    --surface: #ffffff;
+    --surface-2: #f7faf8;
+    --ink: #172b27;
+    --muted: #75827d;
+    --line: #e3ebe6;
+    --green: #18745e;
+    --green-dark: #105744;
+    --mint: #dff3e9;
+    --mint-strong: #bde8d4;
+    --coral: #d65b50;
+    --coral-soft: #fff0ed;
+    --shadow: 0 5px 20px rgba(27, 61, 48, 0.045);
+    --radius: 17px;
+}
+
+/* 2. Global page styles */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "DM Sans", sans-serif;
+    line-height: 1.5;
+}
+
+/* Soft decorative background gradients */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(ellipse at 8% 0%, rgba(189, 232, 212, 0.38), transparent 35%),
+        radial-gradient(ellipse at 95% 8%, rgba(224, 238, 220, 0.55), transparent 28%);
+}
+
+.app {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 24px 24px 48px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 3. Header, logo, and current-user chip */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: Manrope, sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+}
+
+.logo {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: var(--green);
+    color: #ffffff;
+    font-size: 21px;
+    box-shadow: 0 7px 16px #18745e2b;
+}
+
+.brand small {
+    display: block;
+    margin-top: -3px;
+    color: var(--muted);
+    font: 500 11px "DM Sans", sans-serif;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+}
+
+.user-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 7px 6px 12px;
+    background: #ffffffc9;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+#userName {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.avatar {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mint);
+    color: var(--green);
+    font-weight: 800;
+}
+
+/* 4. Welcome heading */
+.welcome {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 8px 0 20px;
+}
+
+.eyebrow {
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.welcome h1 {
+    margin: 5px 0 4px;
+    font: 800 clamp(25px, 3vw, 34px) Manrope, sans-serif;
+    letter-spacing: -1.2px;
+}
+
+.welcome p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+/* 5. Overview statistic cards */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.stat {
+    position: relative;
+    overflow: hidden;
+    padding: 17px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+}
+
+.stat::after {
+    content: "";
+    position: absolute;
+    top: -24px;
+    right: -24px;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--mint);
+    opacity: 0.65;
+}
+
+.stat:nth-child(2)::after {
+    background: #e6edff;
+}
+
+.stat:nth-child(3)::after {
+    background: #fff0d9;
+}
+
+.stat:nth-child(4)::after {
+    background: #fbe4e1;
+}
+
+.stat span {
+    position: relative;
+    z-index: 1;
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.stat strong {
+    position: relative;
+    z-index: 1;
+    font: 800 clamp(20px, 2vw, 25px) Manrope, sans-serif;
+    letter-spacing: -0.7px;
+    overflow-wrap: anywhere;
+}
+
+/* 6. Main layout: left expense column and right sidebar column */
+.main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+    align-items: start;
+    gap: 18px;
+}
+
+.stack {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    min-width: 0;
+}
+
+/* Right sidebar container holding Member Summary and extra cards */
+.member-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+}
+
+/* Member summary expands naturally as members increase */
+.member-card {
+    height: auto;
+    min-height: 0;
+}
+
+/* 7. Reusable card styles */
+.card {
+    min-width: 0;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 17px;
+}
+
+.card h2 {
+    margin: 0;
+    font: 800 16px/1.35 Manrope, sans-serif;
+    letter-spacing: -0.35px;
+}
+
+.subtext {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.section-icon {
+    width: 35px;
+    height: 35px;
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--mint);
+    color: var(--green);
+    font-size: 18px;
+}
+
+/* 8. Forms, labels, inputs, and selects */
+form {
+    display: grid;
+    gap: 14px;
+}
+
+label {
+    display: block;
+    margin: 0 0 7px;
+    color: #44554f;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+input,
+select {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #dce6df;
+    border-radius: 10px;
+    background: #fbfdfb;
+    color: var(--ink);
+    font: 500 14px "DM Sans", sans-serif;
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+}
+
+input::placeholder {
+    color: #a0aaa5;
+}
+
+input:focus,
+select:focus {
+    border-color: #62b99b;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px #18745e12;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.filters {
+    display: grid;
+    gap: 14px;
+}
+
+/* 9. Buttons and variants */
+button {
+    padding: 11px 15px;
+    border: 0;
+    border-radius: 10px;
+    font: 700 13px "DM Sans", sans-serif;
+    cursor: pointer;
+    transition: transform 0.16s, background 0.16s, box-shadow 0.16s;
+}
+
+button:hover {
+    transform: translateY(-1px);
+}
+
+button:focus-visible {
+    outline: 3px solid #72c9a7;
+    outline-offset: 2px;
+}
+
+.btn-primary {
+    background: var(--green);
+    color: #ffffff;
+    box-shadow: 0 5px 12px #18745e20;
+}
+
+.btn-primary:hover {
+    background: var(--green-dark);
+}
+
+.btn-light {
+    background: var(--mint);
+    color: var(--green-dark);
+}
+
+.btn-light:hover {
+    background: var(--mint-strong);
+}
+
+.btn-danger {
+    background: var(--coral-soft);
+    color: var(--coral);
+}
+
+.btn-danger:hover {
+    background: #ffe2dd;
+}
+
+.btn-small {
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.btn-quiet {
+    padding: 8px;
+    background: transparent;
+    color: var(--muted);
+}
+
+.btn-quiet:hover {
+    background: var(--surface-2);
+}
+
+.full {
+    width: 100%;
+}
+
+.button-row {
+    display: flex;
+    gap: 9px;
+}
+
+.button-row > * {
+    flex: 1;
+}
+
+.summary-button {
+    margin-top: 14px;
+}
+
+/* 10. Recent expenses list */
+.expense-list {
+    display: grid;
+    gap: 8px;
+}
+
+.expense {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(110deg, #ffffff, #fcfefc);
+    transition: border-color 0.16s, transform 0.16s;
+}
+
+.expense:hover {
+    border-color: #c7dfd2;
+    transform: translateY(-1px);
+}
+
+.expense-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+}
+
+.category-icon {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    font-size: 17px;
+}
+
+.expense-info {
+    min-width: 0;
+}
+
+.expense-title {
+    font-size: 13px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.expense-meta {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.expense-amount {
+    align-self: flex-start;
+    padding-top: 2px;
+    color: var(--coral);
+    font: 800 14px Manrope, sans-serif;
+    white-space: nowrap;
+}
+
+.empty {
+    padding: 22px 12px;
+    border: 1px dashed #d9e5dd;
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--muted);
+    text-align: center;
+    font-size: 13px;
+}
+
+/* 11. Member summary */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-top: 14px;
+}
+
+.member-card .summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 0;
+}
+
+.summary-item {
+    display: grid;
+    gap: 5px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--surface-2);
+}
+
+.summary-item span {
+    color: var(--muted);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+.summary-item strong {
+    font: 800 15px Manrope, sans-serif;
+    overflow-wrap: anywhere;
+}
+
+.member-card .summary-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 12px;
+}
+
+.member-card .summary-item span {
+    font-size: 12px;
+}
+
+.member-card .summary-item strong {
+    flex-shrink: 0;
+    font-size: 14px;
+    text-align: right;
+}
+
+.result-panel {
+    margin-top: 14px;
+    padding: 13px;
+    border-radius: 11px;
+    background: var(--mint);
+    color: var(--green-dark);
+    font-size: 13px;
+}
+
+/* 12. Monthly and Yearly Summary cards placed directly below Member Summary */
+.summary-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 0;
+}
+
+.summary-layout > .card {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    padding: 20px;
+}
+
+.summary-layout .card-head {
+    margin-bottom: 14px;
+}
+
+.summary-layout .card-head h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.3;
+}
+
+.summary-layout .card-head p,
+.summary-layout .subtext {
+    margin: 5px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.summary-layout form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.summary-layout .row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.summary-layout label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.summary-layout input,
+.summary-layout select {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 13px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--ink);
+}
+
+.summary-layout button {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 4px;
+    padding: 9px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--mint);
+    color: var(--green-dark);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.summary-layout button:hover {
+    background: var(--mint-strong);
+}
+
+.summary-layout .result-panel {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+
+/* 13. Authentication screen */
+#authScreen {
+    max-width: 500px;
+    margin: 5vh auto 0;
+}
+
+.auth-intro {
+    margin: 0 0 24px;
+    text-align: center;
+}
+
+.auth-intro .logo {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 14px;
+    border-radius: 18px;
+    font-size: 25px;
+}
+
+.auth-intro h1 {
+    margin: 0 0 7px;
+    font: 800 30px Manrope, sans-serif;
+    letter-spacing: -1px;
+}
+
+.auth-intro p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.auth-card {
+    padding: 23px;
+    margin-bottom: 15px;
+}
+
+.tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    padding: 5px;
+    margin-bottom: 21px;
+    border-radius: 12px;
+    background: #f0f5f1;
+}
+
+.tab {
+    padding: 10px;
+    background: transparent;
+    color: var(--muted);
+}
+
+.tab.active {
+    background: #ffffff;
+    color: var(--green);
+    box-shadow: 0 2px 7px #163f2c0d;
+}
+
+.auth-secondary {
+    padding: 20px 22px;
+}
+
+.auth-secondary h2 {
+    margin-bottom: 5px;
+}
+
+.auth-secondary .subtext {
+    margin-bottom: 17px;
+}
+
+/* 14. Edit-expense modal */
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: #12251f80;
+    backdrop-filter: blur(5px);
+}
+
+.modal-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 24px;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 25px 80px #10251d40;
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 19px;
+}
+
+.modal-head h2 {
+    margin: 0;
+    font: 800 19px Manrope, sans-serif;
+}
+
+/* 15. Toast notifications */
+.toast {
+    position: fixed;
+    z-index: 100;
+    left: 50%;
+    bottom: 24px;
+    max-width: 90vw;
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: #1d302a;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 18px);
+    transition: opacity 0.22s, transform 0.22s;
+    box-shadow: 0 10px 30px #13251f2e;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.toast.success {
+    background: var(--green);
+}
+
+.toast.error {
+    background: #b93830;
+}
+
+/* 16. Footer */
+.footer-note {
+    margin-top: 26px;
+    color: #9aa69f;
+    text-align: center;
+    font-size: 11px;
+}
+
+/* 17. Tablet layout */
+@media (max-width: 850px) {
+    .app {
+        padding: 20px 16px 40px;
+    }
+
+    .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .main-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .summary-layout {
+        gap: 14px;
+    }
+
+    .stack {
+        gap: 16px;
+    }
+
+    .member-card {
+        height: auto;
+        min-height: 0;
+    }
+
+    .card {
+        padding: 19px;
+    }
+
+    .member-card .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .member-card .summary-item {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .member-card .summary-item strong {
+        text-align: left;
+    }
+}
+
+/* 18. Mobile phone layout */
+@media (max-width: 520px) {
+    .app {
+        padding: 15px 12px 32px;
+    }
+
+    .topbar {
+        align-items: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .brand {
+        gap: 9px;
+        font-size: 17px;
+    }
+
+    .logo {
+        width: 38px;
+        height: 38px;
+    }
+
+    .user-chip {
+        gap: 7px;
+        padding: 5px 6px 5px 9px;
+    }
+
+    .user-chip #userName {
+        max-width: 76px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .welcome {
+        align-items: flex-start;
+    }
+
+    .welcome h1 {
+        font-size: 26px;
+    }
+
+    .stats {
+        gap: 9px;
+    }
+
+    .stat {
+        padding: 14px;
+    }
+
+    .stat strong {
+        font-size: 20px;
+    }
+
+    .stat span {
+        margin-bottom: 7px;
+    }
+
+    .card {
+        padding: 16px;
+        border-radius: 15px;
+    }
+
+    .card-head {
+        margin-bottom: 15px;
+    }
+
+    .row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .expense {
+        gap: 8px;
+        padding: 11px;
+    }
+
+    .category-icon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .expense-amount {
+        font-size: 13px;
+    }
+
+    .summary-grid,
+    .member-card .summary-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .member-card .summary-item {
+        align-items: center;
+        flex-direction: row;
+        gap: 12px;
+    }
+
+    .member-card .summary-item strong {
+        text-align: right;
+    }
+
+    .auth-card {
+        padding: 19px;
+    }
+
+    .auth-secondary {
+        padding: 18px;
+    }
+
+    .modal-card {
+        padding: 20px;
+    }
+
+    .summary-layout > .card {
+        padding: 15px;
+    }
+
+    .summary-layout .row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .summary-layout button {
+        width: 100%;
+    }
+}
+
+/* 19. Accessibility: respect reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+}

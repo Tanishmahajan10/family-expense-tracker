@@ -1,0 +1,663 @@
+from datetime import date
+
+from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from sqlalchemy import func, extract
+
+import bcrypt
+import random
+import string
+import secrets
+
+import models
+from database import engine, SessionLocal
+from schema import (
+    ExpenseCreate,
+    ExpenseUpdate,
+    ExpenseResponse,
+    FamilyCreate,
+    FamilyMemberCreate,
+    FamilyMemberLogin
+)
+
+
+app = FastAPI(title="Expense Tracker API")
+
+
+# ============================================================
+# CORS
+# ============================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+models.Base.metadata.create_all(bind=engine)
+
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ============================================================
+# AUTHENTICATION
+# ============================================================
+
+def get_current_member(
+    session_token: str = Header(..., alias="session_token"),
+    db: Session = Depends(get_db)
+):
+    session = db.query(models.LoginSession).filter(
+        models.LoginSession.session_token == session_token
+    ).first()
+
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session"
+        )
+
+    member = db.query(models.FamilyMember).filter(
+        models.FamilyMember.id == session.member_id
+    ).first()
+
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Member not found"
+        )
+
+    return member
+
+
+# ============================================================
+# CURRENT MEMBER
+# ============================================================
+
+@app.get("/me")
+def get_me(
+    current_member: models.FamilyMember = Depends(get_current_member)
+):
+    return {
+        "member_id": current_member.id,
+        "name": current_member.name,
+        "family_id": current_member.family_id
+    }
+
+
+# ============================================================
+# GET ALL EXPENSES
+# ============================================================
+
+@app.get("/expenses")
+def get_expenses(
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    expenses = db.query(models.Expense).filter(
+        models.Expense.family_id == current_member.family_id
+    ).all()
+
+    result = []
+
+    for expense in expenses:
+
+        expense_member = db.query(models.FamilyMember).filter(
+            models.FamilyMember.id == expense.member_id
+        ).first()
+
+        result.append({
+            "id": expense.id,
+            "amount": expense.amount,
+            "category": expense.category,
+            "date": expense.date,
+            "added_by": (
+                expense_member.name
+                if expense_member
+                else "Unknown"
+            )
+        })
+
+    return result
+
+
+# ============================================================
+# CREATE EXPENSE
+# ============================================================
+
+@app.post(
+    "/expenses",
+    status_code=status.HTTP_201_CREATED
+)
+def create_expense(
+    expense: ExpenseCreate,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    new_expense = models.Expense(
+        **expense.model_dump(),
+        family_id=current_member.family_id,
+        member_id=current_member.id
+    )
+
+    db.add(new_expense)
+    db.commit()
+    db.refresh(new_expense)
+
+    return new_expense
+
+
+# ============================================================
+# FILTER BY CATEGORY
+# ============================================================
+
+@app.get("/expenses/filter")
+def filter_expenses(
+    category: str,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    expenses = db.query(models.Expense).filter(
+        models.Expense.family_id == current_member.family_id,
+        func.lower(models.Expense.category) == category.lower()
+    ).all()
+
+    result = []
+
+    for expense in expenses:
+
+        expense_member = db.query(models.FamilyMember).filter(
+            models.FamilyMember.id == expense.member_id
+        ).first()
+
+        result.append({
+            "id": expense.id,
+            "amount": expense.amount,
+            "category": expense.category,
+            "date": expense.date,
+            "added_by": (
+                expense_member.name
+                if expense_member
+                else "Unknown"
+            )
+        })
+
+    return result
+
+
+# ============================================================
+# FILTER BY DATE RANGE
+# ============================================================
+
+@app.get(
+    "/expenses/filterbydate",
+    response_model=list[ExpenseResponse]
+)
+def get_expense_by_date(
+    start_date: date,
+    end_date: date,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before or equal to end_date"
+        )
+
+    expenses = db.query(models.Expense).filter(
+        models.Expense.family_id == current_member.family_id,
+        models.Expense.date >= start_date,
+        models.Expense.date <= end_date
+    ).all()
+
+    result = []
+
+    for expense in expenses:
+
+        expense_member = db.query(models.FamilyMember).filter(
+            models.FamilyMember.id == expense.member_id
+        ).first()
+
+        result.append({
+            "id": expense.id,
+            "amount": expense.amount,
+            "category": expense.category,
+            "date": expense.date,
+            "added_by": (
+                expense_member.name
+                if expense_member
+                else "Unknown"
+            )
+        })
+
+    return result
+
+
+# ============================================================
+# MONTHLY SUMMARY
+# ============================================================
+
+@app.get("/expenses/summary/monthly")
+def monthly_expense_summary(
+    year: int,
+    month: int,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    if month < 1 or month > 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Month must be between 1 and 12"
+        )
+
+    total_expense = db.query(
+        func.coalesce(
+            func.sum(models.Expense.amount),
+            0
+        )
+    ).filter(
+        models.Expense.family_id == current_member.family_id,
+        extract("year", models.Expense.date) == year,
+        extract("month", models.Expense.date) == month
+    ).scalar()
+
+    return {
+        "year": year,
+        "month": month,
+        "total_expense": total_expense
+    }
+
+
+# ============================================================
+# # SUMMARY BY CATEGORY
+# # ============================================================
+
+# @app.get("/expenses/summary_by_category")
+# def expense_summary_by_category(
+#     category: str,
+#     current_member: models.FamilyMember = Depends(get_current_member),
+#     db: Session = Depends(get_db)
+# ):
+#     total_expense = db.query(
+#         func.coalesce(
+#             func.sum(models.Expense.amount),
+#             0
+#         )
+#     ).filter(
+#         models.Expense.family_id == current_member.family_id,
+#         func.lower(models.Expense.category) == category.lower()
+#     ).scalar()
+
+#     return {
+#         "category": category,
+#         "total_expense": total_expense
+#     }
+
+# ============================================================
+# # SUMMARY BY FAMILY MEMBER
+# # ============================================================
+
+@app.get("/expenses/summary_by_member")
+def expense_summary_by_member(
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    results = db.query(
+        models.FamilyMember.name,
+        func.coalesce(
+            func.sum(models.Expense.amount),
+            0
+        ).label("total_expense")
+    ).outerjoin(
+        models.Expense,
+        models.FamilyMember.id == models.Expense.member_id
+    ).filter(
+        models.FamilyMember.family_id == current_member.family_id
+    ).group_by(
+        models.FamilyMember.id,
+        models.FamilyMember.name
+    ).order_by(
+        models.FamilyMember.name
+    ).all()
+
+    return {
+        "family_id": current_member.family_id,
+        "member_summary": [
+            {
+                "member_name": name,
+                "total_expense": total
+            }
+            for name, total in results
+        ]
+    }
+
+
+# ============================================================
+# YEARLY SUMMARY
+# ============================================================
+
+@app.get("/expenses/summary_by_year")
+def expense_summary_of_all_months(
+    year: int,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    results = db.query(
+        extract(
+            "month",
+            models.Expense.date
+        ).label("month"),
+
+        func.sum(
+            models.Expense.amount
+        ).label("total_expense")
+
+    ).filter(
+        models.Expense.family_id == current_member.family_id,
+        extract("year", models.Expense.date) == year
+    ).group_by(
+        extract("month", models.Expense.date)
+    ).order_by(
+        extract("month", models.Expense.date)
+    ).all()
+
+    monthly_totals = {
+        int(month): total
+        for month, total in results
+    }
+
+    return {
+        "year": year,
+        "monthly_totals": monthly_totals
+    }
+
+
+# ============================================================
+# GET ONE EXPENSE
+# ============================================================
+
+@app.get("/expenses/{expense_id}")
+def get_expense(
+    expense_id: int,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    expense = db.query(models.Expense).filter(
+        models.Expense.id == expense_id,
+        models.Expense.family_id == current_member.family_id
+    ).first()
+
+    if expense is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Expense not found"
+        )
+
+    expense_member = db.query(models.FamilyMember).filter(
+        models.FamilyMember.id == expense.member_id
+    ).first()
+
+    return {
+        "id": expense.id,
+        "amount": expense.amount,
+        "category": expense.category,
+        "date": expense.date,
+        "added_by": (
+            expense_member.name
+            if expense_member
+            else "Unknown"
+        )
+    }
+
+
+# ============================================================
+# UPDATE EXPENSE
+# ============================================================
+
+@app.put("/expenses/{expense_id}")
+def update_expense(
+    expense_id: int,
+    updated_data: ExpenseUpdate,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    expense = db.query(models.Expense).filter(
+        models.Expense.id == expense_id,
+        models.Expense.family_id == current_member.family_id
+    ).first()
+
+    if expense is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Expense not found"
+        )
+
+    update_data = updated_data.model_dump(
+        exclude_unset=True
+    )
+
+    for field, value in update_data.items():
+        setattr(expense, field, value)
+
+    db.commit()
+    db.refresh(expense)
+
+    return {
+        "message": "Expense updated successfully",
+        "id": expense.id,
+        "amount": expense.amount,
+        "category": expense.category,
+        "date": expense.date
+    }
+
+
+# ============================================================
+# DELETE EXPENSE
+# ============================================================
+
+@app.delete("/expenses/{expense_id}")
+def delete_expense(
+    expense_id: int,
+    current_member: models.FamilyMember = Depends(get_current_member),
+    db: Session = Depends(get_db)
+):
+    expense = db.query(models.Expense).filter(
+        models.Expense.id == expense_id,
+        models.Expense.family_id == current_member.family_id
+    ).first()
+
+    if expense is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Expense not found"
+        )
+
+    db.delete(expense)
+    db.commit()
+
+    return {
+        "message": "Expense deleted successfully",
+        "id": expense_id
+    }
+
+
+# ============================================================
+# CREATE FAMILY
+# ============================================================
+
+@app.post(
+    "/families",
+    status_code=status.HTTP_201_CREATED
+)
+async def create_family(
+    family: FamilyCreate,
+    db: Session = Depends(get_db)
+):
+    existing_family = db.query(models.Family).filter(
+        models.Family.name == family.name
+    ).first()
+
+    if existing_family:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Family name already exists"
+        )
+
+    entry_code = ''.join(
+        random.choices(
+            string.ascii_uppercase + string.digits,
+            k=6
+        )
+    )
+
+    new_family = models.Family(
+        name=family.name,
+        entry_code=entry_code
+    )
+
+    db.add(new_family)
+    db.commit()
+    db.refresh(new_family)
+
+    return {
+        "message": "Family created successfully",
+        "family_id": new_family.id,
+        "family_name": new_family.name,
+        "entry_code": new_family.entry_code
+    }
+
+
+# ============================================================
+# JOIN FAMILY
+# ============================================================
+
+@app.post(
+    "/families/join",
+    status_code=status.HTTP_201_CREATED
+)
+def join_family(
+    member: FamilyMemberCreate,
+    db: Session = Depends(get_db)
+):
+    family = db.query(models.Family).filter(
+        models.Family.entry_code == member.family_code
+    ).first()
+
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid family code"
+        )
+
+    existing_member = db.query(models.FamilyMember).filter(
+        models.FamilyMember.name == member.name,
+        models.FamilyMember.family_id == family.id
+    ).first()
+
+    if existing_member:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Member already exists in this family"
+        )
+
+    hashed_pin = bcrypt.hashpw(
+        member.pin.encode("utf-8"),
+        bcrypt.gensalt()
+    ).decode("utf-8")
+
+    new_member = models.FamilyMember(
+        name=member.name,
+        pin_hash=hashed_pin,
+        family_id=family.id
+    )
+
+    db.add(new_member)
+    db.commit()
+    db.refresh(new_member)
+
+    return {
+        "message": "Joined family successfully",
+        "member_id": new_member.id,
+        "name": new_member.name,
+        "family_id": family.id,
+        "family_name": family.name
+    }
+
+
+# ============================================================
+# LOGIN
+# ============================================================
+
+@app.post("/families/login")
+def login_family_member(
+    member: FamilyMemberLogin,
+    db: Session = Depends(get_db)
+):
+    family = db.query(models.Family).filter(
+        models.Family.entry_code == member.family_code
+    ).first()
+
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid family code"
+        )
+
+    family_member = db.query(models.FamilyMember).filter(
+        models.FamilyMember.name == member.name,
+        models.FamilyMember.family_id == family.id
+    ).first()
+
+    if family_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member not found in this family"
+        )
+
+    if not bcrypt.checkpw(
+        member.pin.encode("utf-8"),
+        family_member.pin_hash.encode("utf-8")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect PIN"
+        )
+
+    session_token = secrets.token_urlsafe(32)
+
+    new_session = models.LoginSession(
+        session_token=session_token,
+        member_id=family_member.id
+    )
+
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+
+    return {
+        "message": "Login successful",
+        "session_token": session_token,
+        "member_id": family_member.id,
+        "name": family_member.name,
+        "family_id": family.id,
+        "family_name": family.name
+    }

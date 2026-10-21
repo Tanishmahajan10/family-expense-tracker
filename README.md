@@ -128,7 +128,7 @@ family-expense-tracker/
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/family-expense-tracker.git
+git clone https://github.com/Tanishmahajan10/family-expense-tracker.git
 ```
 
 Move into the project:

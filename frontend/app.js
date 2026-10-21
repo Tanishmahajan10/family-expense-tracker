@@ -1,5 +1,5 @@
 
-const API = "http://127.0.0.1:8000";
+const API = "https://family-expense-tracker-p9os.onrender.com";
 
 let token = localStorage.getItem("session_token");
 let user = JSON.parse(localStorage.getItem("user") || "null");

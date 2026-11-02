@@ -1,8 +1,19 @@
 
-const API = "https://family-expense-tracker-p9os.onrender.com";
+// API URL: uses environment/window override, localStorage, or auto-detects localhost vs production
+const API = (typeof window !== "undefined" && window.API_BASE_URL)
+  || localStorage.getItem("api_url")
+  || ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && window.location.port !== "8000"
+      ? `http://${window.location.hostname}:8000`
+      : (window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://127.0.0.1:8000"));
 
 let token = localStorage.getItem("session_token");
-let user = JSON.parse(localStorage.getItem("user") || "null");
+let user = null;
+try {
+  user = JSON.parse(localStorage.getItem("user") || "null");
+} catch {
+  user = null;
+  localStorage.removeItem("user");
+}
 let expenses = [];
 let editingId = null;
 
@@ -45,15 +56,30 @@ function headers() {
 
 // API helper
 async function api(path, options = {}) {
-  const res = await fetch(API + path, {
-    ...options,
-    headers: options.headers || headers()
-  });
+  let res;
+  try {
+    res = await fetch(API + path, {
+      ...options,
+      headers: options.headers || headers()
+    });
+  } catch (err) {
+    throw new Error(`Cannot connect to server at ${API}. Please check your connection.`);
+  }
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data.detail || "Something went wrong");
+    if (res.status === 401) {
+      localStorage.removeItem("session_token");
+      localStorage.removeItem("user");
+      token = null;
+      user = null;
+      showAuth();
+    }
+    const errorMsg = Array.isArray(data.detail)
+      ? data.detail.map(d => d.msg || JSON.stringify(d)).join(", ")
+      : (data.detail || "Something went wrong");
+    throw new Error(errorMsg);
   }
 
   return data;
@@ -485,14 +511,21 @@ $("loadYearly").onclick = async () => {
 };
 
 // Logout
-$("logoutBtn").onclick = () => {
-  localStorage.removeItem("session_token");
-  localStorage.removeItem("user");
-
-  token = null;
-  user = null;
-
-  showAuth();
+$("logoutBtn").onclick = async () => {
+  try {
+    if (token) {
+      await fetch(API + "/families/logout", {
+        method: "POST",
+        headers: headers()
+      }).catch(() => {});
+    }
+  } finally {
+    localStorage.removeItem("session_token");
+    localStorage.removeItem("user");
+    token = null;
+    user = null;
+    showAuth();
+  }
 };
 
 // Initial screen
@@ -500,4 +533,15 @@ if (token && user) {
   showDashboard();
 } else {
   showAuth();
+}
+
+// Global functions for inline HTML buttons
+window.openEdit = openEdit;
+window.deleteExpense = deleteExpense;
+
+// Register Service Worker for PWA
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
 }

@@ -1,7 +1,13 @@
 from datetime import date
 import os
+import sys
 from pathlib import Path
 from typing import Optional
+
+# Ensure the backend directory is in sys.path regardless of how uvicorn is started
+current_dir = Path(__file__).resolve().parent
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.middleware.cors import CORSMiddleware

@@ -15,9 +15,14 @@ elif SQLALCHEMY_DATABASE_URL.startswith("postgresql://") and not SQLALCHEMY_DATA
 
 connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 
+engine_kwargs = {"connect_args": connect_args}
+if not SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 300
+
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    connect_args=connect_args
+    **engine_kwargs
 )
 
 SessionLocal = sessionmaker(

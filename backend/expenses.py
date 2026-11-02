@@ -106,6 +106,23 @@ def get_current_member(
 
 
 # ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    try:
+        db.execute(func.now())
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    return {
+        "status": "ok",
+        "database": db_status
+    }
+
+
+# ============================================================
 # CURRENT MEMBER
 # ============================================================
 
@@ -175,9 +192,16 @@ def create_expense(
         member_id=current_member.id
     )
 
-    db.add(new_expense)
-    db.commit()
-    db.refresh(new_expense)
+    try:
+        db.add(new_expense)
+        db.commit()
+        db.refresh(new_expense)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while saving expense."
+        )
 
     return new_expense
 
@@ -475,8 +499,15 @@ def update_expense(
     for field, value in update_data.items():
         setattr(expense, field, value)
 
-    db.commit()
-    db.refresh(expense)
+    try:
+        db.commit()
+        db.refresh(expense)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while updating expense."
+        )
 
     return {
         "message": "Expense updated successfully",
@@ -508,8 +539,15 @@ def delete_expense(
             detail="Expense not found"
         )
 
-    db.delete(expense)
-    db.commit()
+    try:
+        db.delete(expense)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while deleting expense."
+        )
 
     return {
         "message": "Expense deleted successfully",
@@ -525,12 +563,12 @@ def delete_expense(
     "/families",
     status_code=status.HTTP_201_CREATED
 )
-async def create_family(
+def create_family(
     family: FamilyCreate,
     db: Session = Depends(get_db)
 ):
     existing_family = db.query(models.Family).filter(
-        models.Family.name == family.name
+        func.lower(models.Family.name) == family.name.strip().lower()
     ).first()
 
     if existing_family:
@@ -539,20 +577,39 @@ async def create_family(
             detail="Family name already exists"
         )
 
-    entry_code = ''.join(
-        secrets.choice(
-            string.ascii_uppercase + string.digits
-        ) for _ in range(6)
-    )
+    # Retry loop to guarantee a unique 6-character code
+    entry_code = None
+    for _ in range(15):
+        candidate = ''.join(
+            secrets.choice(
+                string.ascii_uppercase + string.digits
+            ) for _ in range(6)
+        )
+        if not db.query(models.Family).filter(models.Family.entry_code == candidate).first():
+            entry_code = candidate
+            break
+
+    if not entry_code:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate unique family code. Please try again."
+        )
 
     new_family = models.Family(
-        name=family.name,
+        name=family.name.strip(),
         entry_code=entry_code
     )
 
-    db.add(new_family)
-    db.commit()
-    db.refresh(new_family)
+    try:
+        db.add(new_family)
+        db.commit()
+        db.refresh(new_family)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while saving family."
+        )
 
     return {
         "message": "Family created successfully",
@@ -606,9 +663,16 @@ def join_family(
         family_id=family.id
     )
 
-    db.add(new_member)
-    db.commit()
-    db.refresh(new_member)
+    try:
+        db.add(new_member)
+        db.commit()
+        db.refresh(new_member)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while joining family."
+        )
 
     return {
         "message": "Joined family successfully",
@@ -665,9 +729,16 @@ def login_family_member(
         member_id=family_member.id
     )
 
-    db.add(new_session)
-    db.commit()
-    db.refresh(new_session)
+    try:
+        db.add(new_session)
+        db.commit()
+        db.refresh(new_session)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while saving login session."
+        )
 
     return {
         "message": "Login successful",

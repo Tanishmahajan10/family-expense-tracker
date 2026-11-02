@@ -1,10 +1,41 @@
 
-// API URL: uses environment/window override, localStorage, or auto-detects localhost vs production
-const API = (typeof window !== "undefined" && window.API_BASE_URL)
-  || localStorage.getItem("api_url")
-  || ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && window.location.port !== "8000"
-      ? `http://${window.location.hostname}:8000`
-      : (window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://127.0.0.1:8000"));
+// Determine backend API URL automatically:
+// 1. window.API_BASE_URL (explicit programmatic override)
+// 2. localStorage.getItem("api_url") (user-configured override)
+// 3. Localhost development: port 5500 / 3000 -> http://127.0.0.1:8000
+// 4. Meta tag <meta name="api-base-url" content="..."> in index.html
+// 5. Render Frontend Static Site: route to Render Backend Web Service
+// 6. Direct FastAPI host or custom unified domain: window.location.origin
+function getApiBaseUrl() {
+  if (typeof window !== "undefined" && window.API_BASE_URL) {
+    return window.API_BASE_URL;
+  }
+  const stored = localStorage.getItem("api_url");
+  if (stored) return stored.replace(/\/+$/, "");
+
+  const loc = window.location;
+  // Local development on Live Server (e.g. port 5500, 3000, 5173) or file://
+  if (loc.protocol === "file:" || ((loc.hostname === "localhost" || loc.hostname === "127.0.0.1") && loc.port && loc.port !== "8000")) {
+    return `http://${loc.hostname || "127.0.0.1"}:8000`;
+  }
+
+  const metaTag = document.querySelector('meta[name="api-base-url"]');
+  if (metaTag && metaTag.content && !metaTag.content.startsWith("%")) {
+    return metaTag.content.replace(/\/+$/, "");
+  }
+
+  if (loc.hostname && loc.hostname.includes("family-expense-tracker-frontend.onrender.com")) {
+    return "https://family-expense-tracker-p9os.onrender.com";
+  }
+
+  if (loc.origin && loc.origin !== "null") {
+    return loc.origin;
+  }
+
+  return "http://127.0.0.1:8000";
+}
+
+const API = getApiBaseUrl();
 
 let token = localStorage.getItem("session_token");
 let user = null;
@@ -66,7 +97,24 @@ async function api(path, options = {}) {
     throw new Error(`Cannot connect to server at ${API}. Please check your connection.`);
   }
 
-  const data = await res.json().catch(() => ({}));
+  const contentType = res.headers.get("content-type") || "";
+  let data;
+
+  if (contentType.includes("application/json")) {
+    data = await res.json().catch(() => null);
+  } else {
+    const rawText = await res.text().catch(() => "");
+    if (!res.ok) {
+      throw new Error(`Server returned error ${res.status}: ${rawText.slice(0, 120) || res.statusText}`);
+    } else {
+      // Received 200 OK but with HTML! This means the request hit a static site or fallback page, NOT the API!
+      throw new Error(`Configuration Error: Received HTML instead of JSON from ${API + path}. The frontend is connecting to a static web server instead of the backend API.`);
+    }
+  }
+
+  if (!data) {
+    throw new Error("Invalid response received from server.");
+  }
 
   if (!res.ok) {
     if (res.status === 401) {
@@ -280,6 +328,7 @@ $("familyForm").onsubmit = async event => {
   event.preventDefault();
 
   const familyNameInput = $("familyName").value.trim();
+  const result = $("familyResult");
 
   try {
     const data = await api("/families", {
@@ -289,13 +338,14 @@ $("familyForm").onsubmit = async event => {
       })
     });
 
-    const result = $("familyResult");
+    if (!data || !data.entry_code) {
+      throw new Error("Family was created, but no family code was returned. Please try again.");
+    }
+
+    const familyName = data.family_name || familyNameInput || "Family";
+    const entryCode = data.entry_code;
+
     result.classList.remove("hidden");
-
-    // Handle all key variations gracefully
-    const familyName = data.family_name || data.name || familyNameInput || "Family";
-    const entryCode = data.entry_code || data.family_code || data.code || "";
-
     result.innerHTML = `
       <strong>${escapeHTML(familyName)}</strong> created.<br />
       Share this family code:
@@ -303,16 +353,18 @@ $("familyForm").onsubmit = async event => {
       <small style="color: var(--color-subtext, #555);">Use this code in "Join a family" above.</small>
     `;
 
-    // Auto-fill into Join form for convenience
-    if (entryCode) {
-      if ($("joinFamilyCode")) $("joinFamilyCode").value = entryCode;
-      if ($("loginFamilyCode")) $("loginFamilyCode").value = entryCode;
-    }
+    // Auto-fill into Join form and Sign-in form for convenience
+    if ($("joinFamilyCode")) $("joinFamilyCode").value = entryCode;
+    if ($("loginFamilyCode")) $("loginFamilyCode").value = entryCode;
 
     $("familyForm").reset();
 
     showToast("Family created! Code: " + entryCode, "success");
   } catch (error) {
+    if (result) {
+      result.classList.remove("hidden");
+      result.innerHTML = `<span style="color: #b91c1c; font-weight: 500;">⚠️ Error: ${escapeHTML(error.message)}</span>`;
+    }
     showToast(error.message, "error");
   }
 };

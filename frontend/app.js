@@ -279,26 +279,39 @@ $("joinForm").onsubmit = async event => {
 $("familyForm").onsubmit = async event => {
   event.preventDefault();
 
+  const familyNameInput = $("familyName").value.trim();
+
   try {
     const data = await api("/families", {
       method: "POST",
       body: JSON.stringify({
-        name: $("familyName").value.trim()
+        name: familyNameInput
       })
     });
 
     const result = $("familyResult");
     result.classList.remove("hidden");
 
+    // Handle all key variations gracefully
+    const familyName = data.family_name || data.name || familyNameInput || "Family";
+    const entryCode = data.entry_code || data.family_code || data.code || "";
+
     result.innerHTML = `
-      <strong>${escapeHTML(data.family_name)}</strong> created.<br />
+      <strong>${escapeHTML(familyName)}</strong> created.<br />
       Share this family code:
-      <strong>${escapeHTML(data.entry_code)}</strong>
+      <strong style="letter-spacing: 2px; font-size: 1.15em; color: var(--color-primary, #1e3a2f);">${escapeHTML(entryCode)}</strong><br />
+      <small style="color: var(--color-subtext, #555);">Use this code in "Join a family" above.</small>
     `;
+
+    // Auto-fill into Join form for convenience
+    if (entryCode) {
+      if ($("joinFamilyCode")) $("joinFamilyCode").value = entryCode;
+      if ($("loginFamilyCode")) $("loginFamilyCode").value = entryCode;
+    }
 
     $("familyForm").reset();
 
-    showToast("Family created", "success");
+    showToast("Family created! Code: " + entryCode, "success");
   } catch (error) {
     showToast(error.message, "error");
   }

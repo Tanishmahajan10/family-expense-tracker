@@ -1,7 +1,12 @@
 from datetime import date
+import os
+from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 
@@ -29,13 +34,18 @@ app = FastAPI(title="Expense Tracker API")
 # CORS
 # ============================================================
 
+cors_env = os.getenv("CORS_ORIGINS", "").strip()
+cors_origins = [o.strip() for o in cors_env.split(",") if o.strip()] if cors_env else [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://family-expense-tracker-frontend.onrender.com"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "https://family-expense-tracker-frontend.onrender.com"
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -524,10 +534,9 @@ async def create_family(
         )
 
     entry_code = ''.join(
-        random.choices(
-            string.ascii_uppercase + string.digits,
-            k=6
-        )
+        secrets.choice(
+            string.ascii_uppercase + string.digits
+        ) for _ in range(6)
     )
 
     new_family = models.Family(
@@ -662,3 +671,78 @@ def login_family_member(
         "family_id": family.id,
         "family_name": family.name
     }
+
+
+# ============================================================
+# LOGOUT
+# ============================================================
+
+@app.post("/families/logout")
+def logout_family_member(
+    session_token: Optional[str] = Header(None, alias="session_token"),
+    db: Session = Depends(get_db)
+):
+    if session_token:
+        session = db.query(models.LoginSession).filter(
+            models.LoginSession.session_token == session_token
+        ).first()
+        if session:
+            db.delete(session)
+            db.commit()
+
+    return {"message": "Logged out successfully"}
+
+
+# ============================================================
+# STATIC FILES & PWA (FRONTEND)
+# ============================================================
+
+frontend_path = Path(__file__).resolve().parent.parent / "frontend"
+
+if frontend_path.exists() and frontend_path.is_dir():
+    @app.get("/", include_in_schema=False)
+    def serve_index():
+        index_file = frontend_path / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        return {"message": "Expense Tracker API is running"}
+
+    @app.get("/style.css", include_in_schema=False)
+    def serve_style():
+        css = frontend_path / "style.css"
+        if css.exists():
+            return FileResponse(css, media_type="text/css")
+        raise HTTPException(status_code=404)
+
+    @app.get("/app.js", include_in_schema=False)
+    def serve_app():
+        js = frontend_path / "app.js"
+        if js.exists():
+            return FileResponse(js, media_type="application/javascript")
+        raise HTTPException(status_code=404)
+
+    @app.get("/manifest.json", include_in_schema=False)
+    def serve_manifest():
+        m = frontend_path / "manifest.json"
+        if m.exists():
+            return FileResponse(m, media_type="application/manifest+json")
+        raise HTTPException(status_code=404)
+
+    @app.get("/sw.js", include_in_schema=False)
+    def serve_sw():
+        sw = frontend_path / "sw.js"
+        if sw.exists():
+            return FileResponse(
+                sw,
+                media_type="application/javascript",
+                headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"}
+            )
+        raise HTTPException(status_code=404)
+
+    @app.get("/icons/{icon_name}", include_in_schema=False)
+    def serve_icon(icon_name: str):
+        safe_name = Path(icon_name).name
+        icon_file = frontend_path / "icons" / safe_name
+        if icon_file.exists():
+            return FileResponse(icon_file, media_type="image/png")
+        raise HTTPException(status_code=404)

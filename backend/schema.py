@@ -16,26 +16,29 @@
 #         }
 #     }
 
-from datetime import date
+from typing import Optional
+from datetime import date as dt_date
 from pydantic import BaseModel, Field, ConfigDict
 
 
 class ExpenseCreate(BaseModel):
     amount: float = Field(gt=0)
     category: str = Field(min_length=2, max_length=50)
-    date: date
+    date: dt_date
 
 
 class ExpenseUpdate(BaseModel):
-    amount: float = Field(gt=0)
-    category: str = Field(min_length=2, max_length=50)
+    amount: Optional[float] = Field(default=None, gt=0)
+    category: Optional[str] = Field(default=None, min_length=2, max_length=50)
+    date: Optional[dt_date] = None
 
 
 class ExpenseResponse(BaseModel):
     id: int
     amount: float
     category: str
-    date: date
+    date: dt_date
+    added_by: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

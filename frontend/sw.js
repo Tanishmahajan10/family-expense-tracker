@@ -1,15 +1,11 @@
-// SpendStory Service Worker v1.0
-// Handles caching and offline support for the PWA install prompt.
+// SpendStory Service Worker v2.1
+const CACHE_NAME = "spendstory-v2.1";
 
-const CACHE_NAME = "spendstory-v1";
-const CACHE_VERSION = 1;
-
-// Core app shell files to cache for offline use
 const APP_SHELL = [
   "/",
   "/index.html",
   "/style.css",
-  "/app.js",
+  "/app.js?v=2.1",
   "/manifest.json",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png"

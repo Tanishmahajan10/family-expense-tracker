@@ -1,22 +1,54 @@
+# Python caches and bytecode
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
 fastapienv/
 venv/
 .venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
-expenses.db
+# Node / frontend dependencies (if added)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Databases and SQLite artifacts
 *.db
 *.sqlite
 *.sqlite3
 *.db-journal
 *.db-shm
 *.db-wal
+backend/expenses.db
+expenses.db
 
+# Secrets and Environment Variables
 .env
 .env.*
-.env.example
+.env.local
+.env.production
+# Keep .env.example tracked as documentation template
+!.env.example
 
+# IDE & OS files
 .vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
+Thumbs.db
 
+# Logs and runtime data
 *.log
+logs/
+*.pid
+tmp/
+scratch/

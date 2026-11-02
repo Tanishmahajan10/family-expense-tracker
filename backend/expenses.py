@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, text
 
 import bcrypt
 import random
@@ -58,7 +58,11 @@ app.add_middleware(
 )
 
 
-models.Base.metadata.create_all(bind=engine)
+try:
+    models.Base.metadata.create_all(bind=engine)
+except Exception as e:
+    import logging
+    logging.getLogger("uvicorn.error").error(f"Failed to create database tables on startup: {e}")
 
 
 # ============================================================
@@ -112,7 +116,7 @@ def get_current_member(
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     try:
-        db.execute(func.now())
+        db.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
@@ -615,7 +619,11 @@ def create_family(
         "message": "Family created successfully",
         "family_id": new_family.id,
         "family_name": new_family.name,
-        "entry_code": new_family.entry_code
+        "entry_code": new_family.entry_code,
+        # Backward compatibility aliases for cached PWA clients:
+        "name": new_family.name,
+        "code": new_family.entry_code,
+        "family_code": new_family.entry_code
     }
 
 

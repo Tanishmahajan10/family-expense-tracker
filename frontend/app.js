@@ -62,16 +62,54 @@ const currentRealMonth = currentDateObj.getMonth(); // 0-indexed (0=Jan, 11=Dec)
 let chartYear = null;
 let chartMonth = null;
 
+const KNOWN_CATEGORIES = [
+  "Food", "Travel", "Shopping", "Bills", "Education",
+  "Health", "Entertainment", "Groceries", "Transport", "Other"
+];
+
 const CATEGORY_COLORS = {
   "Food": "#18745e",
   "Travel": "#2563eb",
+  "Transport": "#0284c7",
   "Shopping": "#d97706",
   "Bills": "#d65b50",
   "Education": "#7c3aed",
   "Health": "#059669",
   "Entertainment": "#db2777",
+  "Groceries": "#16a34a",
   "Other": "#64748b"
 };
+
+// Extracts main/parent category (e.g., "Food (Mawa)" -> "Food", "Other (Cutting)" -> "Other")
+function getMainCategory(rawCategory) {
+  if (!rawCategory) return "Other";
+  let str = String(rawCategory).trim();
+  if (!str) return "Other";
+
+  // Check parenthetical subcategory: "Food (Mawa)" -> "Food"
+  if (str.includes("(")) {
+    const parent = str.split("(")[0].trim();
+    if (parent) {
+      str = parent;
+    }
+  } else {
+    // Check delimiter with surrounding spaces e.g. "Food - Sweets", "Food: Sweets", "Food / Sweets"
+    const parts = str.split(/\s*[:\-\/]\s+/);
+    if (parts.length > 1 && parts[0].trim()) {
+      const candidate = parts[0].trim();
+      if (KNOWN_CATEGORIES.some(k => k.toLowerCase() === candidate.toLowerCase())) {
+        str = candidate;
+      }
+    }
+  }
+
+  // Normalize casing for known categories
+  const matched = KNOWN_CATEGORIES.find(k => k.toLowerCase() === str.toLowerCase());
+  if (matched) return matched;
+
+  // Title-case custom main categories
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
 const $ = id => document.getElementById(id);
 
@@ -476,12 +514,12 @@ function renderCategoryPieChart() {
     return expY === chartYear && expM === chartMonth;
   });
 
-  // Calculate totals per category
+  // Calculate totals aggregated by main category
   const categoryTotals = {};
   let monthTotal = 0;
 
   monthExpenses.forEach(e => {
-    const cat = e.category ? e.category.trim() : "Other";
+    const cat = getMainCategory(e.category);
     const amt = Number(e.amount || 0);
     categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
     monthTotal += amt;
@@ -987,7 +1025,8 @@ if (token && user) {
   showAuth();
 }
 
-// Global functions for inline HTML buttons
+// Global functions for inline HTML buttons and testing
+window.getMainCategory = getMainCategory;
 window.prevMonth = prevMonth;
 window.nextMonth = nextMonth;
 window.onChartMonthSelect = onChartMonthSelect;

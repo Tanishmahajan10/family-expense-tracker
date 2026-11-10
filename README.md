@@ -299,20 +299,13 @@ Session tokens are randomly generated and associated with a member in the databa
 
 The backend uses the session token to determine the current member and family.
 
-However, this project should not be considered production-grade authentication yet.
-
-For a production application, authentication and session management should be strengthened.
-
 # Future Improvements
 
 Possible future improvements include:
 
-- Better authentication and session expiration
 - Password/PIN reset functionality
-- Full-text expense search
 - Export expenses (CSV / PDF)
 - Custom date range reporting
-- Role-based family permissions (admin vs member)
 
 ---
 

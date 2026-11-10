@@ -14,8 +14,9 @@ ENV/
 env.bak/
 venv.bak/
 
-# Node / frontend dependencies (if added)
+# Node / frontend dependencies & hosting
 node_modules/
+.vercel/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -45,6 +46,10 @@ expenses.db
 *.swo
 .DS_Store
 Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
 
 # Logs and runtime data
 *.log

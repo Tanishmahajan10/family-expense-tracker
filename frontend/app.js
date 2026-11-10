@@ -80,13 +80,13 @@ const CATEGORY_COLORS = {
   "Other": "#64748b"
 };
 
-// Extracts main/parent category (e.g., "Food (Mawa)" -> "Food", "Other (Cutting)" -> "Other")
+// Extracts main/parent category (e.g., "Food (Sweets)" -> "Food", "Other (Books)" -> "Other")
 function getMainCategory(rawCategory) {
   if (!rawCategory) return "Other";
   let str = String(rawCategory).trim();
   if (!str) return "Other";
 
-  // Check parenthetical subcategory: "Food (Mawa)" -> "Food"
+  // Check parenthetical subcategory: "Food (Sweets)" -> "Food"
   if (str.includes("(")) {
     const parent = str.split("(")[0].trim();
     if (parent) {
@@ -453,6 +453,25 @@ function onChartMonthSelect(val) {
   renderCategoryPieChart();
 }
 
+// Setup high-DPI canvas for razor-sharp rendering on Retina/mobile OLED screens
+function setupHighDpiCanvas(canvas, displaySize = 220) {
+  const dpr = Math.max(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(displaySize * dpr);
+  canvas.height = Math.round(displaySize * dpr);
+  canvas.style.width = `${displaySize}px`;
+  canvas.style.height = `${displaySize}px`;
+
+  const ctx = canvas.getContext("2d");
+  if (ctx.resetTransform) {
+    ctx.resetTransform();
+  } else {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, displaySize, displaySize);
+  return { ctx, size: displaySize };
+}
+
 // Render category spending pie chart for selected month
 function renderCategoryPieChart() {
   const canvas = $("categoryPieCanvas");
@@ -471,14 +490,11 @@ function renderCategoryPieChart() {
       periodLabel.textContent = "No expenses recorded";
     }
 
-    const ctx = canvas.getContext("2d");
-    const width = canvas.width;
-    const height = canvas.height;
-    ctx.clearRect(0, 0, width, height);
-
-    const centerX = width / 2;
-    const centerY = height / 2;
+    const { ctx, size } = setupHighDpiCanvas(canvas, 220);
+    const centerX = size / 2;
+    const centerY = size / 2;
     const radius = Math.min(centerX, centerY) - 14;
+
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
     ctx.strokeStyle = "#e3ebe6";
@@ -527,17 +543,15 @@ function renderCategoryPieChart() {
 
   const categories = Object.keys(categoryTotals).sort((a, b) => categoryTotals[b] - categoryTotals[a]);
 
-  // Clean canvas
-  const ctx = canvas.getContext("2d");
-  const width = canvas.width;
-  const height = canvas.height;
-  ctx.clearRect(0, 0, width, height);
+  // Clean and prepare canvas with Retina high-DPI scaling
+  const { ctx, size } = setupHighDpiCanvas(canvas, 220);
 
   // If no expenses for selected month, show clean empty state
   if (!categories.length || monthTotal === 0) {
-    const centerX = width / 2;
-    const centerY = height / 2;
+    const centerX = size / 2;
+    const centerY = size / 2;
     const radius = Math.min(centerX, centerY) - 14;
+
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
     ctx.strokeStyle = "#e3ebe6";
@@ -559,9 +573,9 @@ function renderCategoryPieChart() {
     return;
   }
 
-  // Draw Pie / Donut Chart
-  const centerX = width / 2;
-  const centerY = height / 2;
+  // Draw Pie / Donut Chart with sharp rendering
+  const centerX = size / 2;
+  const centerY = size / 2;
   const radius = Math.min(centerX, centerY) - 16;
   const innerRadius = radius * 0.55; // Clean modern donut chart style
 
@@ -581,22 +595,22 @@ function renderCategoryPieChart() {
     ctx.fill();
 
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
     startAngle = endAngle;
   });
 
-  // Center label inside donut
+  // Center label inside donut (crisp font rendering)
   ctx.fillStyle = "#172b27";
-  ctx.font = "700 14px Manrope, sans-serif";
+  ctx.font = "700 15px Manrope, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(money(monthTotal), centerX, centerY - 6);
 
   ctx.fillStyle = "#75827d";
-  ctx.font = "500 10px 'DM Sans', sans-serif";
-  ctx.fillText("Total Spent", centerX, centerY + 10);
+  ctx.font = "600 10px 'DM Sans', sans-serif";
+  ctx.fillText("Total Spent", centerX, centerY + 11);
 
   // Render Legend
   legend.innerHTML = categories.map(cat => {

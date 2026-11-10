@@ -1,11 +1,11 @@
-// SpendStory Service Worker v2.8
-const CACHE_NAME = "spendstory-v2.8";
+// SpendStory Service Worker v2.9
+const CACHE_NAME = "spendstory-v2.9";
 
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/style.css",
-  "/app.js?v=2.8",
+  "/style.css?v=2.9",
+  "/app.js?v=2.9",
   "/manifest.json",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png"

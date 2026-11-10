@@ -48,7 +48,6 @@ cors_origins = [o.strip() for o in cors_env.split(",") if o.strip()] if cors_env
     "http://127.0.0.1:8000",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://family-expense-tracker-frontend.onrender.com"
 ]
 
 app.add_middleware(

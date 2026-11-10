@@ -30,8 +30,16 @@ The application allows family members to create or join a family, log in using a
 - Edit expenses
 - Delete expenses
 - Categorize expenses
+- Filter expenses by category (All, Food, Transport, Shopping, Bills, Education, Health, Entertainment, Other)
 - Store expense dates
 - Display which family member added each expense
+
+### Visual Analytics & Month Navigation
+
+- **Spending by Category Chart**: Canvas-based interactive chart showing category-wise spending proportions and totals
+- **Dynamic Month/Year Picker**: Automatically detects and lists only months containing recorded expenses for the family
+- **Month Stepper (`<` / `>`)**: Jump between previous and next active months, seamlessly skipping months with no expenses
+- **Interactive Legend**: Displays color-coded dots, percentages, and formatted currency amounts for each active category
 
 ### Expense Categories
 
@@ -58,6 +66,9 @@ The application supports:
 
 - Responsive interface
 - Mobile-friendly design
+- Progressive Web App (PWA) with offline caching and service worker (`sw.js`)
+- Category filter dropdown / pills for instant filtering
+- Canvas donut chart with dynamic month navigation
 - Login and Join Family interface
 - Expense dashboard
 - Add Expense form
@@ -89,7 +100,8 @@ The application supports:
 
 ### Database
 
-- **SQLite**
+- **PostgreSQL (Supabase)** in production
+- **SQLite** fallback for local offline development
 - **SQLAlchemy ORM**
 
 ### Server
@@ -114,8 +126,13 @@ family-expense-tracker/
 ├── frontend/
 │   ├── index.html
 │   ├── style.css
-│   └── app.js
+│   ├── app.js
+│   ├── sw.js
+│   ├── manifest.json
+│   ├── vercel.json
+│   └── icons/
 │
+├── vercel.json
 └── README.md
 ```
 
@@ -221,30 +238,31 @@ You can use the Swagger interface to test the API endpoints.
 
 # Frontend
 
-The frontend is built using plain HTML, CSS, and JavaScript.
+The frontend is built using plain HTML, CSS, JavaScript, and a Progressive Web App (PWA) Service Worker.
 
-Open the `frontend` folder and run it using a local development server.
+### Local Development
 
-For example, using VS Code Live Server:
+Run the frontend using a local development server. For example, using VS Code Live Server:
 
 1. Open the project in VS Code.
 2. Open `frontend/index.html`.
-3. Start Live Server.
-4. Open the provided local URL in your browser.
+3. Start Live Server (runs on `http://127.0.0.1:5500` or `http://localhost:3000`).
+4. The frontend automatically connects to the local backend on `http://127.0.0.1:8000`.
 
-The frontend communicates with the FastAPI backend running on:
+### Production Hosting (Vercel)
 
-```text
-http://127.0.0.1:8000
-```
+The frontend is configured for deployment as a static site on **Vercel**:
+- Includes `vercel.json` route configurations.
+- `app.js` automatically routes API traffic to the production Render backend when hosted on `*.vercel.app`.
+- Can be deployed by importing the repository on Vercel with Root Directory set to `frontend` (or project root).
 
 ---
 
 # Database
 
-The project currently uses **SQLite** as its database.
+The project uses **PostgreSQL via Supabase** in production, with automatic fallback to **SQLite** (`expenses.db`) for local offline development.
 
-SQLAlchemy is used as the ORM for communicating with the database.
+SQLAlchemy is used as the ORM for communicating with the database. It connects using the `DATABASE_URL` environment variable.
 
 The database tables are created automatically when the application starts.
 
@@ -291,19 +309,18 @@ Possible future improvements include:
 
 - Better authentication and session expiration
 - Password/PIN reset functionality
-- Expense search
-- More advanced filtering
-- Expense analytics and charts
-- Cloud database
-- Production deployment
-- Role-based family permissions
+- Full-text expense search
+- Export expenses (CSV / PDF)
+- Custom date range reporting
+- Role-based family permissions (admin vs member)
 
 ---
 
 # Project Status
 
-**Current Version:** V1
-
-The project is currently focused on building a simple family expense management system with FastAPI, SQLAlchemy, SQLite, and a JavaScript frontend.
+**Current Architecture:**
+- **Frontend:** Static PWA hosted on **Vercel** (or Render Static Site)
+- **Backend:** FastAPI REST API hosted on **Render**
+- **Database:** PostgreSQL on **Supabase** (production connection pooler) with automatic **SQLite** fallback for local development
 
 ---

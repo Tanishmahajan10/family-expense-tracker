@@ -28,6 +28,11 @@ function getApiBaseUrl() {
     return "https://family-expense-tracker-p9os.onrender.com";
   }
 
+  // Vercel deployment support: route requests to Render backend
+  if (loc.hostname && (loc.hostname.endsWith(".vercel.app") || loc.hostname.includes("vercel.app"))) {
+    return "https://family-expense-tracker-p9os.onrender.com";
+  }
+
   if (loc.origin && loc.origin !== "null") {
     return loc.origin;
   }
@@ -46,7 +51,27 @@ try {
   localStorage.removeItem("user");
 }
 let expenses = [];
+let selectedCategory = "ALL";
 let editingId = null;
+
+// Spending by Category Chart Month State
+const currentDateObj = new Date();
+const currentRealYear = currentDateObj.getFullYear();
+const currentRealMonth = currentDateObj.getMonth(); // 0-indexed (0=Jan, 11=Dec)
+
+let chartYear = null;
+let chartMonth = null;
+
+const CATEGORY_COLORS = {
+  "Food": "#18745e",
+  "Travel": "#2563eb",
+  "Shopping": "#d97706",
+  "Bills": "#d65b50",
+  "Education": "#7c3aed",
+  "Health": "#059669",
+  "Entertainment": "#db2777",
+  "Other": "#64748b"
+};
 
 const $ = id => document.getElementById(id);
 
@@ -144,6 +169,9 @@ function showDashboard() {
 
   $("date").value = new Date().toISOString().split("T")[0];
 
+  chartYear = null;
+  chartMonth = null;
+
   loadExpenses();
 }
 
@@ -158,11 +186,20 @@ function renderExpenses() {
   const list = $("expenseList");
   list.innerHTML = "";
 
-  let total = 0;
-
+  // 1. Overall stats from all loaded expenses
+  let overallTotal = 0;
   expenses.forEach(expense => {
-    total += Number(expense.amount);
+    overallTotal += Number(expense.amount || 0);
+  });
+  $("totalCount").textContent = expenses.length;
+  $("totalAmount").textContent = money(overallTotal);
 
+  // 2. Filter expenses based on selectedCategory
+  const displayedExpenses = selectedCategory === "ALL"
+    ? expenses
+    : expenses.filter(e => String(e.category || "").toLowerCase() === selectedCategory.toLowerCase());
+
+  displayedExpenses.forEach(expense => {
     const item = document.createElement("div");
     item.className = "expense";
 
@@ -202,16 +239,346 @@ function renderExpenses() {
     list.appendChild(item);
   });
 
-  $("totalCount").textContent = expenses.length;
-  $("totalAmount").textContent = money(total);
+  if (!displayedExpenses.length) {
+    if (expenses.length > 0 && selectedCategory !== "ALL") {
+      list.innerHTML = `
+        <div class="empty">
+          No expenses found for "${escapeHTML(selectedCategory)}".
+        </div>
+      `;
+    } else {
+      list.innerHTML = `
+        <div class="empty">
+          No expenses found. Add your first expense above.
+        </div>
+      `;
+    }
+  }
+}
 
-  if (!expenses.length) {
-    list.innerHTML = `
-      <div class="empty">
-        No expenses found. Add your first expense above.
+// Helpers for Month Navigation
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+// Extract only the distinct months that actually contain expenses for the family
+function getAvailableExpenseMonths() {
+  const monthMap = new Map();
+
+  expenses.forEach(exp => {
+    if (!exp.date) return;
+    const parts = String(exp.date).split("-");
+    if (parts.length < 2) return;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1; // 0-indexed (0=Jan, 11=Dec)
+    if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return;
+
+    const key = `${y}-${m}`;
+    if (!monthMap.has(key)) {
+      monthMap.set(key, { year: y, month: m });
+    }
+  });
+
+  // Sort descending: newest (highest year, highest month) first
+  return Array.from(monthMap.values()).sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    return b.month - a.month;
+  });
+}
+
+// Select default month: current month if it has expenses, else most recent month with expenses
+function selectDefaultChartMonth(availableMonths) {
+  if (!availableMonths.length) {
+    chartYear = currentRealYear;
+    chartMonth = currentRealMonth;
+    return;
+  }
+
+  // Preserve user selection if it still exists in available months
+  if (chartYear !== null && chartMonth !== null) {
+    const exists = availableMonths.some(m => m.year === chartYear && m.month === chartMonth);
+    if (exists) return;
+  }
+
+  // Check if current calendar month has expenses
+  const currentHasExpenses = availableMonths.some(m => m.year === currentRealYear && m.month === currentRealMonth);
+  if (currentHasExpenses) {
+    chartYear = currentRealYear;
+    chartMonth = currentRealMonth;
+    return;
+  }
+
+  // Otherwise, select the most recent month containing expenses
+  chartYear = availableMonths[0].year;
+  chartMonth = availableMonths[0].month;
+}
+
+// Populate dropdown and controls using ONLY months with expenses
+function updateChartControls(availableMonths) {
+  const select = $("chartMonthSelect");
+  const prevBtn = $("prevMonthBtn");
+  const nextBtn = $("nextMonthBtn");
+
+  if (select) {
+    select.innerHTML = "";
+
+    if (!availableMonths.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No expenses";
+      select.appendChild(opt);
+      select.disabled = true;
+    } else {
+      select.disabled = false;
+      availableMonths.forEach(mObj => {
+        const opt = document.createElement("option");
+        opt.value = `${mObj.year}-${mObj.month}`;
+        opt.textContent = `${monthNames[mObj.month]} ${mObj.year}`;
+        select.appendChild(opt);
+      });
+      select.value = `${chartYear}-${chartMonth}`;
+    }
+  }
+
+  // Update previous/next navigation buttons
+  // availableMonths is sorted newest (index 0) to oldest (last index)
+  if (!availableMonths.length || availableMonths.length <= 1) {
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+  } else {
+    const currentIndex = availableMonths.findIndex(m => m.year === chartYear && m.month === chartMonth);
+    if (prevBtn) {
+      // Previous (older) button: disabled if already at the oldest month with expenses
+      prevBtn.disabled = (currentIndex === -1 || currentIndex >= availableMonths.length - 1);
+    }
+    if (nextBtn) {
+      // Next (newer) button: disabled if already at the newest month with expenses
+      nextBtn.disabled = (currentIndex === -1 || currentIndex <= 0);
+    }
+  }
+}
+
+// Move to next available older month containing expenses
+function prevMonth() {
+  const availableMonths = getAvailableExpenseMonths();
+  if (availableMonths.length <= 1) return;
+
+  const currentIndex = availableMonths.findIndex(m => m.year === chartYear && m.month === chartMonth);
+  if (currentIndex === -1) {
+    const older = availableMonths.find(m => m.year < chartYear || (m.year === chartYear && m.month < chartMonth));
+    if (older) {
+      chartYear = older.year;
+      chartMonth = older.month;
+    }
+  } else if (currentIndex < availableMonths.length - 1) {
+    chartYear = availableMonths[currentIndex + 1].year;
+    chartMonth = availableMonths[currentIndex + 1].month;
+  }
+
+  renderCategoryPieChart();
+}
+
+// Move to next available newer month containing expenses
+function nextMonth() {
+  const availableMonths = getAvailableExpenseMonths();
+  if (availableMonths.length <= 1) return;
+
+  const currentIndex = availableMonths.findIndex(m => m.year === chartYear && m.month === chartMonth);
+  if (currentIndex === -1) {
+    const newerMonths = availableMonths.filter(m => m.year > chartYear || (m.year === chartYear && m.month > chartMonth));
+    if (newerMonths.length > 0) {
+      const nearestNewer = newerMonths[newerMonths.length - 1];
+      chartYear = nearestNewer.year;
+      chartMonth = nearestNewer.month;
+    }
+  } else if (currentIndex > 0) {
+    chartYear = availableMonths[currentIndex - 1].year;
+    chartMonth = availableMonths[currentIndex - 1].month;
+  }
+
+  renderCategoryPieChart();
+}
+
+// Direct month selection from dropdown
+function onChartMonthSelect(val) {
+  if (!val) return;
+  const parts = String(val).split("-");
+  if (parts.length < 2) return;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+
+  if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return;
+
+  chartYear = y;
+  chartMonth = m;
+  renderCategoryPieChart();
+}
+
+// Render category spending pie chart for selected month
+function renderCategoryPieChart() {
+  const canvas = $("categoryPieCanvas");
+  const legend = $("chartLegend");
+  const periodLabel = $("chartPeriodLabel");
+  if (!canvas || !legend) return;
+
+  const availableMonths = getAvailableExpenseMonths();
+  selectDefaultChartMonth(availableMonths);
+  updateChartControls(availableMonths);
+
+  const displayMonthName = monthNames[chartMonth] || "Month";
+
+  if (!availableMonths.length) {
+    if (periodLabel) {
+      periodLabel.textContent = "No expenses recorded";
+    }
+
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(centerX, centerY) - 14;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#e3ebe6";
+    ctx.lineWidth = 18;
+    ctx.stroke();
+
+    ctx.fillStyle = "#75827d";
+    ctx.font = "600 13px Manrope, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("No data", centerX, centerY);
+
+    legend.innerHTML = `
+      <div class="chart-empty-state">
+        <p>No expenses recorded yet.</p>
+        <small>Add an expense above to see your category breakdown.</small>
       </div>
     `;
+    return;
   }
+
+  if (periodLabel) {
+    periodLabel.textContent = `${displayMonthName} ${chartYear} breakdown`;
+  }
+
+  // Filter expenses for selected chartYear and chartMonth (timezone-safe)
+  const monthExpenses = expenses.filter(expense => {
+    if (!expense.date) return false;
+    const parts = String(expense.date).split("-");
+    if (parts.length < 2) return false;
+    const expY = parseInt(parts[0], 10);
+    const expM = parseInt(parts[1], 10) - 1;
+    return expY === chartYear && expM === chartMonth;
+  });
+
+  // Calculate totals per category
+  const categoryTotals = {};
+  let monthTotal = 0;
+
+  monthExpenses.forEach(e => {
+    const cat = e.category ? e.category.trim() : "Other";
+    const amt = Number(e.amount || 0);
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
+    monthTotal += amt;
+  });
+
+  const categories = Object.keys(categoryTotals).sort((a, b) => categoryTotals[b] - categoryTotals[a]);
+
+  // Clean canvas
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+
+  // If no expenses for selected month, show clean empty state
+  if (!categories.length || monthTotal === 0) {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(centerX, centerY) - 14;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#e3ebe6";
+    ctx.lineWidth = 18;
+    ctx.stroke();
+
+    ctx.fillStyle = "#75827d";
+    ctx.font = "600 13px Manrope, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("No data", centerX, centerY);
+
+    legend.innerHTML = `
+      <div class="chart-empty-state">
+        <p>No expenses recorded for ${escapeHTML(displayMonthName)} ${chartYear}.</p>
+        <small>Select another month with recorded expenses.</small>
+      </div>
+    `;
+    return;
+  }
+
+  // Draw Pie / Donut Chart
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(centerX, centerY) - 16;
+  const innerRadius = radius * 0.55; // Clean modern donut chart style
+
+  let startAngle = -0.5 * Math.PI; // Start at 12 o'clock
+
+  categories.forEach(cat => {
+    const amount = categoryTotals[cat];
+    const sliceAngle = (amount / monthTotal) * 2 * Math.PI;
+    const endAngle = startAngle + sliceAngle;
+    const color = CATEGORY_COLORS[cat] || "#64748b";
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.arc(centerX, centerY, innerRadius, endAngle, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    startAngle = endAngle;
+  });
+
+  // Center label inside donut
+  ctx.fillStyle = "#172b27";
+  ctx.font = "700 14px Manrope, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(money(monthTotal), centerX, centerY - 6);
+
+  ctx.fillStyle = "#75827d";
+  ctx.font = "500 10px 'DM Sans', sans-serif";
+  ctx.fillText("Total Spent", centerX, centerY + 10);
+
+  // Render Legend
+  legend.innerHTML = categories.map(cat => {
+    const amount = categoryTotals[cat];
+    const pct = ((amount / monthTotal) * 100).toFixed(1);
+    const color = CATEGORY_COLORS[cat] || "#64748b";
+
+    return `
+      <div class="chart-legend-item">
+        <div class="chart-legend-label">
+          <span class="chart-legend-dot" style="background: ${color};"></span>
+          <span class="chart-legend-cat">${escapeHTML(cat)}</span>
+        </div>
+        <div class="chart-legend-numbers">
+          <span class="chart-legend-pct">${pct}%</span>
+          <strong class="chart-legend-amt">${money(amount)}</strong>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 // Load expenses and dashboard summaries
@@ -220,6 +587,7 @@ async function loadExpenses() {
     expenses = await api("/expenses");
 
     renderExpenses();
+    renderCategoryPieChart();
 
     await Promise.all([
       loadMonthTotal(),
@@ -582,7 +950,7 @@ $("logoutBtn").onclick = async () => {
       await fetch(API + "/families/logout", {
         method: "POST",
         headers: headers()
-      }).catch(() => {});
+      }).catch(() => { });
     }
   } finally {
     localStorage.removeItem("session_token");
@@ -593,6 +961,25 @@ $("logoutBtn").onclick = async () => {
   }
 };
 
+// Category filter change event
+if ($("categoryFilter")) {
+  $("categoryFilter").onchange = e => {
+    selectedCategory = e.target.value;
+    renderExpenses();
+  };
+}
+
+// Chart Month Navigation events
+if ($("prevMonthBtn")) {
+  $("prevMonthBtn").onclick = prevMonth;
+}
+if ($("nextMonthBtn")) {
+  $("nextMonthBtn").onclick = nextMonth;
+}
+if ($("chartMonthSelect")) {
+  $("chartMonthSelect").onchange = e => onChartMonthSelect(e.target.value);
+}
+
 // Initial screen
 if (token && user) {
   showDashboard();
@@ -601,12 +988,15 @@ if (token && user) {
 }
 
 // Global functions for inline HTML buttons
+window.prevMonth = prevMonth;
+window.nextMonth = nextMonth;
+window.onChartMonthSelect = onChartMonthSelect;
 window.openEdit = openEdit;
 window.deleteExpense = deleteExpense;
 
 // Register Service Worker for PWA
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").catch(() => { });
   });
 }

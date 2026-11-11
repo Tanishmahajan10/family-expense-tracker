@@ -64,7 +64,7 @@ let chartMonth = null;
 
 const KNOWN_CATEGORIES = [
   "Food", "Travel", "Shopping", "Bills", "Education",
-  "Health", "Entertainment", "Groceries", "Transport", "Other"
+  "Health", "Entertainment", "Grocery", "Groceries", "Transport", "Other"
 ];
 
 const CATEGORY_COLORS = {
@@ -76,7 +76,8 @@ const CATEGORY_COLORS = {
   "Education": "#7c3aed",
   "Health": "#059669",
   "Entertainment": "#db2777",
-  "Groceries": "#16a34a",
+  "Grocery": "#16a34a",
+  "Grocery": "#16a34a",
   "Other": "#64748b"
 };
 
@@ -109,6 +110,38 @@ function getMainCategory(rawCategory) {
 
   // Title-case custom main categories
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Check if an expense matches the selected category filter
+function matchesCategoryFilter(expense, targetCategory) {
+  if (!targetCategory || targetCategory === "ALL") return true;
+
+  const raw = String(expense.category || "").trim().toLowerCase();
+  const main = getMainCategory(expense.category).toLowerCase();
+  const target = String(targetCategory).trim().toLowerCase();
+
+  // 1. Direct or main category match
+  if (main === target || raw === target) return true;
+
+  // 2. Prefix match (e.g. raw is "Food (Mawa)" and target is "Food")
+  if (
+    raw.startsWith(target + " (") ||
+    raw.startsWith(target + " -") ||
+    raw.startsWith(target + ":") ||
+    raw.startsWith(target + "/")
+  ) {
+    return true;
+  }
+
+  // 3. Common synonyms
+  if ((target === "grocery" || target === "groceries") && (main === "grocery" || main === "groceries" || raw.includes("grocer"))) {
+    return true;
+  }
+  if ((target === "travel" || target === "transport") && (main === "travel" || main === "transport" || raw.includes("travel") || raw.includes("transport"))) {
+    return true;
+  }
+
+  return false;
 }
 
 const $ = id => document.getElementById(id);
@@ -209,6 +242,10 @@ function showDashboard() {
 
   chartYear = null;
   chartMonth = null;
+  selectedCategory = "ALL";
+  if ($("categoryFilter")) {
+    $("categoryFilter").value = "ALL";
+  }
 
   loadExpenses();
 }
@@ -232,10 +269,10 @@ function renderExpenses() {
   $("totalCount").textContent = expenses.length;
   $("totalAmount").textContent = money(overallTotal);
 
-  // 2. Filter expenses based on selectedCategory
+  // 2. Filter expenses based on selectedCategory (supports parent categories and subcategories)
   const displayedExpenses = selectedCategory === "ALL"
     ? expenses
-    : expenses.filter(e => String(e.category || "").toLowerCase() === selectedCategory.toLowerCase());
+    : expenses.filter(e => matchesCategoryFilter(e, selectedCategory));
 
   displayedExpenses.forEach(expense => {
     const item = document.createElement("div");
@@ -291,6 +328,49 @@ function renderExpenses() {
         </div>
       `;
     }
+  }
+}
+
+// Dynamically populate category filter options based on family's recorded expenses
+function updateCategoryFilter() {
+  const select = $("categoryFilter");
+  if (!select) return;
+
+  const currentSelection = selectedCategory || select.value || "ALL";
+
+  // Collect distinct main categories used by the family
+  const familyCategories = new Set();
+  expenses.forEach(e => {
+    const main = getMainCategory(e.category);
+    if (main) familyCategories.add(main);
+  });
+
+  // Base list of standard categories
+  const defaultList = [
+    "Food", "Bills", "Grocery", "Travel", "Shopping",
+    "Education", "Health", "Entertainment", "Other"
+  ];
+
+  // Merge family categories with defaults, sorting alphabetically
+  const allCats = new Set([...familyCategories, ...defaultList]);
+  const sortedCats = Array.from(allCats).sort((a, b) => a.localeCompare(b));
+
+  let optionsHtml = `<option value="ALL">All Categories (${expenses.length})</option>`;
+  sortedCats.forEach(cat => {
+    const count = expenses.filter(e => matchesCategoryFilter(e, cat)).length;
+    const countLabel = count > 0 ? ` (${count})` : "";
+    optionsHtml += `<option value="${escapeHTML(cat)}">${escapeHTML(cat)}${countLabel}</option>`;
+  });
+
+  select.innerHTML = optionsHtml;
+
+  // Restore current selection if it still exists
+  const hasSelection = Array.from(select.options).some(opt => opt.value.toLowerCase() === currentSelection.toLowerCase());
+  if (hasSelection) {
+    select.value = currentSelection;
+  } else {
+    select.value = "ALL";
+    selectedCategory = "ALL";
   }
 }
 
@@ -638,6 +718,7 @@ async function loadExpenses() {
   try {
     expenses = await api("/expenses");
 
+    updateCategoryFilter();
     renderExpenses();
     renderCategoryPieChart();
 
@@ -1041,6 +1122,8 @@ if (token && user) {
 
 // Global functions for inline HTML buttons and testing
 window.getMainCategory = getMainCategory;
+window.matchesCategoryFilter = matchesCategoryFilter;
+window.updateCategoryFilter = updateCategoryFilter;
 window.prevMonth = prevMonth;
 window.nextMonth = nextMonth;
 window.onChartMonthSelect = onChartMonthSelect;
